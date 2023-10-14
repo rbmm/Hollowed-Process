@@ -140,10 +140,9 @@ NTSTATUS FindNoCfgDll(_In_ ULONG SizeOfImage, _Out_ PHANDLE SectionHandle)
 
 				} while (NextEntryOffset = pfdi->NextEntryOffset);
 			}
-
+__exit:
 			LocalFree(buf);
 		}
-__exit:
 		NtClose(oa.RootDirectory);
 	}
 
