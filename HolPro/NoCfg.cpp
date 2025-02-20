@@ -96,6 +96,8 @@ BOOLEAN IsImageOk(_In_ ULONG SizeOfImage, _In_ HANDLE hSection)
 	return fOk;
 }
 
+#define FILE_SHARE_VALID_FLAGS 7
+
 NTSTATUS FindNoCfgDll(_In_ ULONG SizeOfImage, _Out_ PHANDLE SectionHandle)
 {
 	HANDLE hFile;

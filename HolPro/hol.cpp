@@ -183,8 +183,70 @@ void Inject(PVOID BaseOfImage)
 	}
 }
 
-void WINAPI ep(void*)
+#include <compressapi.h>
+
+inline ULONG BOOL_TO_ERROR(BOOL f)
 {
-	Inject(codesec_exe_begin);
+	return f ? NOERROR : GetLastError();
+}
+
+ULONG Unzip(_In_ LPCVOID CompressedData,
+	_In_ ULONG CompressedDataSize,
+	_Out_ PVOID* pUncompressedBuffer,
+	_Out_ ULONG* pUncompressedDataSize)
+{
+	ULONG dwError;
+	COMPRESSOR_HANDLE DecompressorHandle;
+
+	if (NOERROR == (dwError = BOOL_TO_ERROR(CreateDecompressor(COMPRESS_ALGORITHM_MSZIP, 0, &DecompressorHandle))))
+	{
+		SIZE_T UncompressedBufferSize = 0;
+		PVOID UncompressedBuffer = 0;
+
+		while (ERROR_INSUFFICIENT_BUFFER == (dwError = BOOL_TO_ERROR(Decompress(
+			DecompressorHandle, CompressedData, CompressedDataSize,
+			UncompressedBuffer, UncompressedBufferSize, &UncompressedBufferSize))) && !UncompressedBuffer)
+		{
+			if (!(UncompressedBuffer = LocalAlloc(LMEM_FIXED, UncompressedBufferSize)))
+			{
+				dwError = GetLastError();
+				break;
+			}
+		}
+
+		if (NOERROR == dwError)
+		{
+			if (UncompressedBuffer)
+			{
+				*pUncompressedDataSize = (ULONG)UncompressedBufferSize;
+				*pUncompressedBuffer = UncompressedBuffer, UncompressedBuffer = 0;
+			}
+			else
+			{
+				dwError = ERROR_INTERNAL_ERROR;
+			}
+		}
+
+		if (UncompressedBuffer)
+		{
+			LocalFree(UncompressedBuffer);
+		}
+
+		CloseDecompressor(DecompressorHandle);
+	}
+
+	return dwError;
+}
+
+void WINAPI ep(PVOID pv)
+{
+	pv = codesec_exe_begin;
+	ULONG cb = RtlPointerToOffset(codesec_exe_begin, codesec_exe_end);
+	if (NOERROR == Unzip(pv, cb, &pv, &cb))
+	{
+		Inject(pv);
+		LocalFree(pv);
+	}
+	
 	ExitProcess(0);
 }
