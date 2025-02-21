@@ -95,7 +95,7 @@ NTSTATUS ProtectImage(HANDLE hProcess, PVOID RemoteBase, PIMAGE_NT_HEADERS pinth
 		} while (pish++, --NumberOfSections);
 	}
 
-	return TRUE;
+	return STATUS_SUCCESS;
 }
 
 #ifdef _AMD64_
