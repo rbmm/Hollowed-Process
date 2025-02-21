@@ -24,6 +24,9 @@
     <ClCompile Include="NoCfg.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="zip.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -31,8 +34,23 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="code64.asm">
+    <CustomBuild Include="x64.exe" />
+    <CustomBuild Include="x86.exe" />
+    <CustomBuild Include="x86.asm">
       <Filter>Source Files</Filter>
     </CustomBuild>
+    <CustomBuild Include="x64.asm">
+      <Filter>Source Files</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include=".rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include=".rc2">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

