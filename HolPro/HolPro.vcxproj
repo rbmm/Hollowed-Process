@@ -71,13 +71,13 @@
     </CustomBuild>
     <CustomBuild Include="x64.exe">
       <FileType>Document</FileType>
-      <Command>$(SolutionDir)NewScProj.exe *exe.$(PlatformShortName).asm*%(Identity)*tozasm*nowait</Command>
+      <Command>"$(SolutionDir)NewScProj.exe" *exe.$(PlatformShortName).asm*%(Identity)*tozasm*nowait</Command>
       <Outputs>exe.$(PlatformShortName).asm</Outputs>
       <ExcludedFromBuild Condition="'$(PlatformTarget)'!='x64'">true</ExcludedFromBuild>
     </CustomBuild>
     <CustomBuild Include="x86.exe">
       <FileType>Document</FileType>
-      <Command>$(SolutionDir)NewScProj.exe *exe.$(PlatformShortName).asm*%(Identity)*tozasm*nowait</Command>
+      <Command>"$(SolutionDir)NewScProj.exe" *exe.$(PlatformShortName).asm*%(Identity)*tozasm*nowait</Command>
       <Outputs>exe.$(PlatformShortName).asm</Outputs>
       <ExcludedFromBuild Condition="'$(PlatformTarget)'!='x86'">true</ExcludedFromBuild>
     </CustomBuild>
