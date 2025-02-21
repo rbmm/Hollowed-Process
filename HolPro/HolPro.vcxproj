@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <VCProjectVersion>16.0</VCProjectVersion>
+    <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{923bd4b0-fbbe-c9d1-516d-498dbbc5d3e4}</ProjectGuid>
     <RootNamespace>HolPro</RootNamespace>
@@ -30,7 +30,6 @@
   <ImportGroup Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup>
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
@@ -72,29 +71,15 @@
     </CustomBuild>
     <CustomBuild Include="x64.exe">
       <FileType>Document</FileType>
-      <Command>
-        $(SolutionDir)NewScProj.exe *exe.$(PlatformShortName).asm*%(Identity)*tozasm*nowait
-        del $(PlatformShortName).obj
-      </Command>
+      <Command>$(SolutionDir)NewScProj.exe *exe.$(PlatformShortName).asm*%(Identity)*tozasm*nowait</Command>
       <Outputs>exe.$(PlatformShortName).asm</Outputs>
       <ExcludedFromBuild Condition="'$(PlatformTarget)'!='x64'">true</ExcludedFromBuild>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)NewScProj.exe *exe.$(PlatformShortName).asm*%(Identity)*tozasm*nowait
-      </Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)NewScProj.exe *exe.$(PlatformShortName).asm*%(Identity)*tozasm*nowait
-      </Command>
     </CustomBuild>
     <CustomBuild Include="x86.exe">
       <FileType>Document</FileType>
-      <Command>
-        $(SolutionDir)NewScProj.exe *exe.$(PlatformShortName).asm*%(Identity)*tozasm*nowait
-        del $(PlatformShortName).obj
-      </Command>
+      <Command>$(SolutionDir)NewScProj.exe *exe.$(PlatformShortName).asm*%(Identity)*tozasm*nowait</Command>
       <Outputs>exe.$(PlatformShortName).asm</Outputs>
       <ExcludedFromBuild Condition="'$(PlatformTarget)'!='x86'">true</ExcludedFromBuild>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)NewScProj.exe *exe.$(PlatformShortName).asm*%(Identity)*tozasm*nowait
-      </Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)NewScProj.exe *exe.$(PlatformShortName).asm*%(Identity)*tozasm*nowait
-      </Command>
     </CustomBuild>
     <ResourceCompile Include=".rc" />
     <None Include=".rc2" />
