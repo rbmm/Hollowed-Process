@@ -1,1 +1,1 @@
-StartInBand.exe *C:\Program Files\Notepad2\Notepad2.exe*
+StartInBand.exe *C:\Program Files\Notepad2\Notepad2.exe** start.bat
