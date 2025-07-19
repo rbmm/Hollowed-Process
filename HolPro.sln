@@ -9,6 +9,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NewScProj", "NewScProj\NewS
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tool", "tool", "{714F81D7-2258-489B-ABF5-07E756BBB000}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MoveToBand", "MoveToBand\MoveToBand.vcxproj", "{FAF21DD5-3AB8-055C-C646-0E5CB00D0F61}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "StartInBand", "StartInBand\StartInBand.vcxproj", "{7DC92E6A-9F91-BE06-DC49-4B03BD802756}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Release|x64 = Release|x64
@@ -23,6 +27,14 @@ Global
 		{68C81E6E-EA30-65AF-2725-CF136FD0975C}.Release|x64.Build.0 = Release|Win32
 		{68C81E6E-EA30-65AF-2725-CF136FD0975C}.Release|x86.ActiveCfg = Release|Win32
 		{68C81E6E-EA30-65AF-2725-CF136FD0975C}.Release|x86.Build.0 = Release|Win32
+		{FAF21DD5-3AB8-055C-C646-0E5CB00D0F61}.Release|x64.ActiveCfg = Release|x64
+		{FAF21DD5-3AB8-055C-C646-0E5CB00D0F61}.Release|x64.Build.0 = Release|x64
+		{FAF21DD5-3AB8-055C-C646-0E5CB00D0F61}.Release|x86.ActiveCfg = Release|Win32
+		{FAF21DD5-3AB8-055C-C646-0E5CB00D0F61}.Release|x86.Build.0 = Release|Win32
+		{7DC92E6A-9F91-BE06-DC49-4B03BD802756}.Release|x64.ActiveCfg = Release|x64
+		{7DC92E6A-9F91-BE06-DC49-4B03BD802756}.Release|x64.Build.0 = Release|x64
+		{7DC92E6A-9F91-BE06-DC49-4B03BD802756}.Release|x86.ActiveCfg = Release|Win32
+		{7DC92E6A-9F91-BE06-DC49-4B03BD802756}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -31,8 +43,8 @@ Global
 		{68C81E6E-EA30-65AF-2725-CF136FD0975C} = {714F81D7-2258-489B-ABF5-07E756BBB000}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {D474E1E0-DB37-4C64-9FCD-BDE2DCB5F134}
-		        SolutionGuid = {31E95A3C-0BE4-4890-815C-0391F78DB4AF}
 		    SolutionGuid = {0A7AB709-7E2F-4C29-BCBC-0C0093D1DE9D}
+		        SolutionGuid = {31E95A3C-0BE4-4890-815C-0391F78DB4AF}
+		SolutionGuid = {D474E1E0-DB37-4C64-9FCD-BDE2DCB5F134}
 	EndGlobalSection
 EndGlobal
