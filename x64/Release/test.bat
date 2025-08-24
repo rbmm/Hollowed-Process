@@ -1,0 +1,1 @@
+regsvr32 /s /n /i:"c:/windows/notepad.exe*<?*cmdline*?/>" DllInExe.dll
