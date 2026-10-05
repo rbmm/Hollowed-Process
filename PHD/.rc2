@@ -1,0 +1,8 @@
+/////////////////////////////////////////////////////////////////////////////
+//
+// RT_MANIFEST
+//
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+1 RT_MANIFEST ".manifest"
+
+IDI_MAIN_ICO ICON "0.ico"
